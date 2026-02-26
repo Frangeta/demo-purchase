@@ -23,6 +23,7 @@ function App() {
   const [error, setError] = useState('');
   const [config, setConfig] = useState(initialConfig);
   const [classBySku, setClassBySku] = useState({});
+  const [isDark, setIsDark] = useState(false);
 
   const validationWarning = useMemo(() => {
     return ['A', 'B', 'C']
@@ -65,35 +66,56 @@ function App() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl space-y-5 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900">Demo de recomendaciones de compra</h1>
-        <p className="text-sm text-slate-600">
-          Carga un Excel con stock diario por SKU, estima consumo, cobertura y sugiere compra.
-        </p>
-        {fileName ? (
-          <p className="mt-2 inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-            Archivo cargado: {fileName}
-          </p>
-        ) : null}
-      </header>
+    <div className={isDark ? 'dark' : ''}>
+      <main className="min-h-screen bg-background-light px-4 py-8 text-slate-900 transition-colors duration-200 dark:bg-background-dark dark:text-slate-100 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Purchase Recommendations Dashboard</h1>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                Streamline your inventory replenishment with data-driven insights.
+              </p>
+              {fileName ? (
+                <p className="mt-3 inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  Archivo cargado: {fileName}
+                </p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsDark((prev) => !prev)}
+              className="rounded-full p-2 transition-colors hover:bg-slate-200 dark:hover:bg-slate-800"
+              aria-label="Cambiar tema"
+            >
+              <span className="material-icons-outlined block dark:hidden">dark_mode</span>
+              <span className="material-icons-outlined hidden text-yellow-400 dark:block">light_mode</span>
+            </button>
+          </header>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <FileUpload onFileLoaded={handleFileLoaded} error={error} />
-        <ConfigPanel config={config} onConfigChange={setConfig} />
-      </section>
+          <section className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className="lg:col-span-4">
+              <FileUpload onFileLoaded={handleFileLoaded} error={error} />
+            </div>
+            <div className="lg:col-span-8">
+              <ConfigPanel config={config} onConfigChange={setConfig} />
+            </div>
+          </section>
 
-      {validationWarning ? (
-        <div className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-700">{validationWarning}</div>
-      ) : null}
+          {validationWarning ? (
+            <div className="mb-6 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+              {validationWarning}
+            </div>
+          ) : null}
 
-      <ResultsTable
-        results={results}
-        classBySku={classBySku}
-        onClassChange={handleClassChange}
-        onExport={() => exportRecommendations(results)}
-      />
-    </main>
+          <ResultsTable
+            results={results}
+            classBySku={classBySku}
+            onClassChange={handleClassChange}
+            onExport={() => exportRecommendations(results)}
+          />
+        </div>
+      </main>
+    </div>
   );
 }
 
