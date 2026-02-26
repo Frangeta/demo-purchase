@@ -66,6 +66,7 @@ Primera hoja del Excel con columnas:
 - `SKU`
 - `Date`
 - `Stock`
+- `Categoria` (A/B/C)
 
 Se descartan filas inválidas y se normaliza por SKU/fecha.
 

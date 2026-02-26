@@ -62,7 +62,7 @@ function ResultsTable({ results, classBySku, onClassChange, onExport }) {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                {['SKU', 'Clase', 'Última fecha', 'Stock', 'Consumo diario', 'Demanda H', 'Cobertura %', 'Estado', 'Motivo', 'Sugerido'].map((head) => (
+                {['SKU', 'Clase', 'Última fecha', 'Stock', 'Consumo diario', 'Demanda H', 'Cobertura %', 'MIN %', 'BUY %', 'Compra', 'Estado', 'Motivo', 'Sugerido'].map((head) => (
                   <th key={head} className="px-4 py-3 font-semibold">{head}</th>
                 ))}
               </tr>
@@ -87,6 +87,9 @@ function ResultsTable({ results, classBySku, onClassChange, onExport }) {
                   <td className="px-4 py-3">{formatNumber(item.avgDailyConsumption)}</td>
                   <td className="px-4 py-3">{formatNumber(item.horizonDemand)}</td>
                   <td className="px-4 py-3">{Number.isFinite(item.coverageRatio) ? `${formatNumber(item.coveragePct)}%` : '∞'}</td>
+                  <td className="px-4 py-3">{formatNumber(item.minThresholdPct)}%</td>
+                  <td className="px-4 py-3">{formatNumber(item.buyThresholdPct)}%</td>
+                  <td className="px-4 py-3">{item.shouldBuy ? 'Sí' : 'No'}</td>
                   <td className="px-4 py-3">
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${STATE_STYLES[item.state]}`}>{item.state}</span>
                   </td>
