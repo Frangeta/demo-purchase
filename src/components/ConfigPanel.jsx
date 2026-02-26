@@ -36,19 +36,19 @@ function ConfigPanel({ config, onConfigChange }) {
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField
-          label="Ventana consumo (N)"
+          label="Ventana consumo N"
           value={config.windowDays}
           onChange={(value) => onConfigChange({ ...config, windowDays: Number(value) })}
           min={1}
         />
         <NumberField
-          label="Horizonte (H)"
+          label="Horizonte H"
           value={config.horizonDays}
           onChange={(value) => onConfigChange({ ...config, horizonDays: Number(value) })}
           min={1}
         />
         <NumberField
-          label="Días extra"
+          label="Días extra seguridad"
           value={config.safetyExtraDays}
           onChange={(value) => onConfigChange({ ...config, safetyExtraDays: Number(value) })}
           min={0}

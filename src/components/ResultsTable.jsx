@@ -4,10 +4,51 @@ const STATE_STYLES = {
   ROJO: 'bg-red-100 text-red-700',
   AMARILLO: 'bg-amber-100 text-amber-700',
   VERDE: 'bg-emerald-100 text-emerald-700',
+  MUERTO: 'bg-black text-white',
 };
 
 function formatNumber(value) {
-  return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value);
+}
+
+function Sparkline({ points }) {
+  if (!points.length) {
+    return <span className="text-xs text-slate-400">-</span>;
+  }
+
+  const width = 120;
+  const height = 24;
+  const values = points.map((item) => item.stock);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  const path = points
+    .map((point, index) => {
+      const x = (index / Math.max(1, points.length - 1)) * width;
+      const y = height - ((point.stock - min) / range) * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
+
+  return (
+    <svg width={width} height={height} className="overflow-visible">
+      <path d={path} fill="none" stroke="#4f46e5" strokeWidth="1.5" />
+      {points.map((point, index) => {
+        const x = (index / Math.max(1, points.length - 1)) * width;
+        const y = height - ((point.stock - min) / range) * height;
+        return (
+          <circle key={`${point.dateIso}-${point.stock}-${x}`} cx={x} cy={y} r="1.8" fill="#6366f1">
+            <title>{`${point.dateIso}: ${point.stock}`}</title>
+          </circle>
+        );
+      })}
+    </svg>
+  );
 }
 
 function ResultsTable({ results, classBySku, onClassChange, onExport }) {
@@ -42,6 +83,7 @@ function ResultsTable({ results, classBySku, onClassChange, onExport }) {
             <option value="TODOS">Todos</option>
             <option value="ROJO">Rojo</option>
             <option value="AMARILLO">Amarillo</option>
+            <option value="MUERTO">Muerto</option>
             <option value="VERDE">Verde</option>
           </select>
           <button
@@ -59,19 +101,19 @@ function ResultsTable({ results, classBySku, onClassChange, onExport }) {
         <p className="p-8 text-center text-sm text-slate-500">Sin datos para mostrar.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 uppercase tracking-wide text-slate-500">
               <tr>
-                {['SKU', 'Clase', 'Última fecha', 'Stock', 'Consumo diario', 'Demanda H', 'Cobertura %', 'MIN %', 'BUY %', 'Compra', 'Estado', 'Motivo', 'Sugerido'].map((head) => (
-                  <th key={head} className="px-4 py-3 font-semibold">{head}</th>
+                {['SKU', 'Clase', 'Última fecha', 'Stock', 'Tendencia', 'Consumo diario', 'Demanda H', 'Cobertura %', 'Días cobertura', 'Riesgo rotura', 'MIN%', 'BUY%', 'PVP', 'Cantidad sugerida', '€ Compra', 'Estado', 'Motivo'].map((head) => (
+                  <th key={head} className="whitespace-nowrap px-3 py-3 font-semibold">{head}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-200 text-sm">
               {filteredRows.map((item) => (
                 <tr key={item.sku}>
-                  <td className="px-4 py-3 font-medium">{item.sku}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 font-medium">{item.sku}</td>
+                  <td className="px-3 py-3">
                     <select
                       value={classBySku[item.sku] ?? 'B'}
                       onChange={(event) => onClassChange(item.sku, event.target.value)}
@@ -82,19 +124,23 @@ function ResultsTable({ results, classBySku, onClassChange, onExport }) {
                       <option value="C">C</option>
                     </select>
                   </td>
-                  <td className="px-4 py-3">{item.latestDate}</td>
-                  <td className="px-4 py-3">{formatNumber(item.stockCurrent)}</td>
-                  <td className="px-4 py-3">{formatNumber(item.avgDailyConsumption)}</td>
-                  <td className="px-4 py-3">{formatNumber(item.horizonDemand)}</td>
-                  <td className="px-4 py-3">{Number.isFinite(item.coverageRatio) ? `${formatNumber(item.coveragePct)}%` : '∞'}</td>
-                  <td className="px-4 py-3">{formatNumber(item.minThresholdPct)}%</td>
-                  <td className="px-4 py-3">{formatNumber(item.buyThresholdPct)}%</td>
-                  <td className="px-4 py-3">{item.shouldBuy ? 'Sí' : 'No'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">{item.latestDate}</td>
+                  <td className="px-3 py-3">{formatNumber(item.stockCurrent)}</td>
+                  <td className="px-3 py-3"><Sparkline points={item.stockSeries.slice(-15)} /></td>
+                  <td className="px-3 py-3">{formatNumber(item.avgDailyConsumption)}</td>
+                  <td className="px-3 py-3">{formatNumber(item.horizonDemand)}</td>
+                  <td className="px-3 py-3">{Number.isFinite(item.coveragePct) ? `${formatNumber(item.coveragePct)}%` : '∞'}</td>
+                  <td className="px-3 py-3">{Number.isFinite(item.daysCoverage) ? formatNumber(item.daysCoverage) : '∞'}</td>
+                  <td className="px-3 py-3">{item.stockoutRisk}</td>
+                  <td className="px-3 py-3">{formatNumber(item.minThresholdPct)}%</td>
+                  <td className="px-3 py-3">{formatNumber(item.buyThresholdPct)}%</td>
+                  <td className="px-3 py-3">{formatCurrency(item.pvpUnit)}</td>
+                  <td className="px-3 py-3 font-semibold text-indigo-700">{formatNumber(item.suggestedQty)}</td>
+                  <td className="px-3 py-3">{formatCurrency(item.purchaseValue)}</td>
+                  <td className="px-3 py-3">
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${STATE_STYLES[item.state]}`}>{item.state}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{item.reason}</td>
-                  <td className="px-4 py-3 font-semibold text-indigo-700">{formatNumber(item.suggestedQty)}</td>
+                  <td className="px-3 py-3 text-xs text-slate-600">{item.reason}</td>
                 </tr>
               ))}
             </tbody>
