@@ -17,6 +17,20 @@ npm run dev
 
 Abre la URL que indique Vite (normalmente `http://localhost:5173`).
 
+
+## Publicar en GitHub Pages
+
+Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub Pages:
+
+1. Sube el repo a GitHub.
+2. Asegúrate de trabajar sobre la rama `main`.
+3. En GitHub, ve a **Settings → Pages** y en **Build and deployment** selecciona **GitHub Actions**.
+4. Cada push a `main` ejecutará el workflow `.github/workflows/deploy-pages.yml`.
+5. La URL quedará publicada en:
+   - `https://<tu-usuario>.github.io/<tu-repo>/`
+
+> Nota: la configuración de Vite usa rutas relativas (`base: './'`) para que el build funcione correctamente en subrutas como las de GitHub Pages.
+
 ## Formato del archivo de entrada
 
 Usa un único archivo Excel (primera hoja), con columnas obligatorias:
