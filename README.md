@@ -1,158 +1,89 @@
-# Demo web: recomendaciones de compra (React + Vite + Tailwind)
+# Demo web: recomendaciones de compra (React + Vite)
 
-Demo 100% client-side para cargar un Excel de stock diario por SKU y calcular recomendaciones de compra.
+Aplicación client-side para cargar stock diario por SKU y generar recomendaciones de compra.
+
+## Objetivo del refactor
+
+Se rediseñó la app para:
+
+- funcionar de forma robusta en **GitHub Pages**,
+- reducir complejidad visual y técnica,
+- mejorar validaciones y saneamiento de configuración,
+- dejar un flujo de deploy predecible y fácil de mantener.
 
 ## Stack
 
-- React + Vite
+- React 18 + Vite 5
 - Tailwind CSS
-- `xlsx` para lectura y exportación XLSX
+- `xlsx` para lectura y exportación Excel
 
-## Instalación y ejecución
+## Desarrollo local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre la URL que indique Vite (normalmente `http://localhost:5173`).
+## Build de producción
 
-### Error común: `Failed to load module script` con MIME `text/jsx`
-
-Si ves este error en el navegador:
-
-```text
-Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/jsx".
+```bash
+npm run build
+npm run check:pages-build
+npm run preview
 ```
 
-significa que estás sirviendo `index.html` y `src/main.jsx` con un servidor estático "genérico" (o abriendo el HTML directo), en vez de usar Vite.
+## Publicación en GitHub Pages
 
-Soluciones:
+Este repo incluye workflow en `.github/workflows/deploy-pages.yml` con el pipeline oficial de Pages:
 
-1. **Desarrollo local**: ejecuta siempre
+1. build en GitHub Actions,
+2. validación de `dist/index.html`,
+3. upload artifact,
+4. deploy con `actions/deploy-pages`.
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+### Configuración requerida en GitHub
 
-2. **Producción estática**: primero genera build y luego sirve `dist/`
+En **Settings → Pages**, seleccionar **Source: GitHub Actions**.
 
-   ```bash
-   npm run build
-   npm run preview
-   ```
+## Base path para Pages
 
-3. **GitHub Pages**: publica el resultado del workflow (carpeta `dist`) y no el código fuente sin compilar.
+`vite.config.js` calcula `base` así:
 
+- `VITE_BASE_PATH` si existe (útil para pruebas),
+- si no, usa `GITHUB_REPOSITORY` y toma `/<repo>/`,
+- en dev local siempre `base: '/'`.
 
+Ejemplo opcional local:
 
-### Diagnóstico rápido para el error en GitHub Pages
+```bash
+VITE_BASE_PATH=demo-purchase npm run build
+```
 
-Si el error menciona una URL como `https://<usuario>.github.io/<repo>/src/main.jsx`, entonces Pages está sirviendo **código fuente** y no la build.
+## Formato de entrada
 
-Checklist:
+Primera hoja del Excel con columnas:
 
-1. Ejecuta build:
+- `SKU`
+- `Date`
+- `Stock`
 
-   ```bash
-   npm run build
-   npm run check:pages-build
-   ```
+Se descartan filas inválidas y se normaliza por SKU/fecha.
 
-2. Verifica en GitHub Pages que la fuente sea:
-   - rama `gh-pages` carpeta `/ (root)`, **o**
-   - `GitHub Actions` (si usas el workflow de deploy).
+## Lógica de recomendación
 
-3. Asegúrate de **no** publicar `main`/root para este proyecto Vite.
+Por SKU:
 
-## Publicar en GitHub Pages
+1. consumo por intervalo: `max(0, stock_prev - stock_actual)`,
+2. promedio en ventana de últimos `N` intervalos,
+3. demanda horizonte: `promedio * H`,
+4. seguridad: `promedio * días_extra`,
+5. sugerido: `max(0, demanda + seguridad - stock_actual)`,
+6. redondeo por múltiplo,
+7. estado por umbrales MIN/BUY de clase A/B/C.
 
-Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub Pages:
+## Scripts
 
-1. Sube el repo a GitHub.
-2. Asegúrate de trabajar sobre la rama `main`.
-3. En GitHub, ve a **Settings → Pages** y en **Build and deployment** selecciona **Deploy from a branch**.
-4. Selecciona la rama **`gh-pages`** y la carpeta **`/ (root)`**.
-5. Cada push a `main` ejecutará el workflow `.github/workflows/deploy-pages.yml`, que compila y publica `dist/` en `gh-pages`.
-6. La URL quedará publicada en:
-   - `https://<tu-usuario>.github.io/<tu-repo>/`
-
-> Nota: la configuración de Vite detecta automáticamente el nombre del repositorio en GitHub Actions (`GITHUB_REPOSITORY`) y genera `base` como `/<repo>/`, evitando errores de carga de assets en GitHub Pages (por ejemplo al abrir la URL sin slash final). En local mantiene `base: '/'`.
-
-> El workflow está configurado con `npm install` (sin cache de lockfile) para funcionar incluso si el repo no tiene `package-lock.json`.
-
-## Formato del archivo de entrada
-
-Usa un único archivo Excel (primera hoja), con columnas obligatorias:
-
-- `SKU` (texto)
-- `Date` (fecha Excel o string YYYY-MM-DD)
-- `Stock` (número >= 0)
-
-La app:
-- valida columnas y filas,
-- ignora filas vacías/ inválidas,
-- ordena por SKU y fecha ascendente,
-- toma como stock actual el de la última fecha por SKU.
-
-## Lógica de cálculo (por SKU)
-
-1. **Consumo por intervalo**:
-   - si `stock(t) < stock(t-1)`: consumo = `stock(t-1) - stock(t)`
-   - si `stock(t) > stock(t-1)`: entrada (no suma consumo)
-   - si iguales: 0
-2. **Consumo medio diario** en ventana de últimos `N` intervalos disponibles.
-3. **Demanda horizonte**: `consumo_medio_diario * H`.
-4. **Cobertura**:
-   - `stock_actual / demanda_horizonte` si demanda > 0
-   - infinito si demanda = 0
-5. **Cantidad sugerida**:
-   - `max(0, demanda_horizonte + seguridad - stock_actual)`
-   - seguridad implementada como `+ días extra`.
-   - redondeo por múltiplos configurable.
-6. **Semáforo** por clase A/B/C:
-   - ROJO: `stock_actual = 0` o cobertura <= MIN%
-   - AMARILLO: cobertura <= BUY% y > MIN%
-   - VERDE: cobertura > BUY% (o sin consumo reciente con stock > 0)
-
-## Parámetros configurables
-
-### Globales
-
-- Ventana de consumo histórico (`N`, default 7)
-- Horizonte forecast (`H`, default 30)
-- Seguridad por días extra (default 0)
-- Redondeo de sugerencia (múltiplos, default 1)
-
-### Por clase (A/B/C)
-
-Defaults:
-- A: MIN 20 / BUY 60
-- B: MIN 15 / BUY 50
-- C: MIN 10 / BUY 40
-
-La clase default para SKU es **B**, editable por fila en la tabla.
-
-## Export
-
-Botón **Exportar recomendaciones** genera archivo `recomendaciones_compra.xlsx` con:
-
-- SKU
-- Clase
-- UltimaFecha
-- StockActual
-- ConsumoMedioDiario
-- DemandaHorizonte
-- CoberturaPct
-- Estado
-- Motivo
-- CantidadSugerida
-
-## Estructura
-
-- `src/components/FileUpload.jsx`
-- `src/components/ConfigPanel.jsx`
-- `src/components/ResultsTable.jsx`
-- `src/utils/stockUtils.js`
-- `src/App.jsx`
+- `npm run dev`: servidor local.
+- `npm run build`: build Vite.
+- `npm run preview`: preview local de `dist`.
+- `npm run check:pages-build`: valida que `dist/index.html` no apunte a `src/*`.

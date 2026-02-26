@@ -8,8 +8,6 @@ export const CLASS_DEFAULTS = {
   C: { minPct: 10, buyPct: 40 },
 };
 
-const EXCEL_EPOCH_MS = Date.UTC(1899, 11, 30);
-
 function parseDateValue(value) {
   if (value == null || value === '') {
     return null;
@@ -19,20 +17,27 @@ function parseDateValue(value) {
     return value;
   }
 
-  if (typeof value === 'number') {
-    const date = new Date(EXCEL_EPOCH_MS + value * 86400000);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const excelDate = XLSX.SSF.parse_date_code(value);
+    if (!excelDate) {
       return null;
     }
 
-    const normalized = trimmed.includes('/') ? trimmed.replace(/\//g, '-') : trimmed;
+    return new Date(Date.UTC(excelDate.y, excelDate.m - 1, excelDate.d));
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().replace(/\//g, '-');
+    if (!normalized) {
+      return null;
+    }
+
     const date = new Date(normalized);
-    return Number.isNaN(date.getTime()) ? null : date;
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   }
 
   return null;
@@ -46,11 +51,33 @@ function normalizeStock(value) {
   if (value == null || value === '') {
     return null;
   }
+
   const parsed = Number(value);
   if (Number.isNaN(parsed) || parsed < 0) {
     return null;
   }
+
   return parsed;
+}
+
+function sanitizeConfig(config) {
+  const windowDays = Math.max(1, Number(config.windowDays) || 7);
+  const horizonDays = Math.max(1, Number(config.horizonDays) || 30);
+  const safetyExtraDays = Math.max(0, Number(config.safetyExtraDays) || 0);
+  const roundingMultiple = Math.max(1, Number(config.roundingMultiple) || 1);
+
+  const classThresholds = ['A', 'B', 'C'].reduce((acc, className) => {
+    const source = config.classThresholds[className] ?? CLASS_DEFAULTS[className];
+    const minPct = Math.max(0, Number(source.minPct) || 0);
+    const buyPct = Math.max(minPct + 1, Number(source.buyPct) || CLASS_DEFAULTS[className].buyPct);
+
+    return {
+      ...acc,
+      [className]: { minPct, buyPct },
+    };
+  }, {});
+
+  return { windowDays, horizonDays, safetyExtraDays, roundingMultiple, classThresholds };
 }
 
 export function parseWorkbook(fileArrayBuffer) {
@@ -62,10 +89,7 @@ export function parseWorkbook(fileArrayBuffer) {
   }
 
   const sheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, {
-    defval: '',
-    raw: true,
-  });
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
 
   if (!rows.length) {
     throw new Error('La primera hoja no contiene filas con datos.');
@@ -78,24 +102,18 @@ export function parseWorkbook(fileArrayBuffer) {
   }
 
   const parsedRows = rows
-    .map((row, index) => {
+    .map((row) => {
       const sku = String(row.SKU ?? '').trim();
       const parsedDate = parseDateValue(row.Date);
       const stock = normalizeStock(row.Stock);
 
       if (!sku || !parsedDate || stock == null) {
-        return { valid: false, row: index + 2 };
+        return null;
       }
 
-      return {
-        valid: true,
-        sku,
-        date: parsedDate,
-        dateIso: toISODate(parsedDate),
-        stock,
-      };
+      return { sku, date: parsedDate, dateIso: toISODate(parsedDate), stock };
     })
-    .filter((item) => item.valid);
+    .filter(Boolean);
 
   if (!parsedRows.length) {
     throw new Error('No se encontraron filas válidas (SKU, Date, Stock).');
@@ -108,10 +126,13 @@ function roundToMultiple(value, multiple) {
   if (multiple <= 0) {
     return value;
   }
+
   return Math.ceil(value / multiple) * multiple;
 }
 
 export function calculateSkuRecommendations(data, config, classBySku) {
+  const safeConfig = sanitizeConfig(config);
+
   const grouped = data.reduce((acc, row) => {
     if (!acc[row.sku]) {
       acc[row.sku] = [];
@@ -121,51 +142,45 @@ export function calculateSkuRecommendations(data, config, classBySku) {
   }, {});
 
   const results = Object.entries(grouped).map(([sku, rows]) => {
-    const sorted = [...rows].sort((a, b) => a.date - b.date);
+    const byDate = new Map();
+    rows.forEach((row) => {
+      byDate.set(row.dateIso, row);
+    });
+
+    const sorted = [...byDate.values()].sort((a, b) => a.date - b.date);
     const latest = sorted[sorted.length - 1];
     const productClass = classBySku[sku] ?? 'B';
-    const classThresholds = config.classThresholds[productClass] ?? CLASS_DEFAULTS.B;
+    const thresholds = safeConfig.classThresholds[productClass] ?? safeConfig.classThresholds.B;
 
     const intervals = [];
-    for (let i = 1; i < sorted.length; i += 1) {
-      const prev = sorted[i - 1].stock;
-      const curr = sorted[i].stock;
+    for (let index = 1; index < sorted.length; index += 1) {
+      const prev = sorted[index - 1].stock;
+      const curr = sorted[index].stock;
       intervals.push(Math.max(0, prev - curr));
     }
 
-    const intervalWindow = Math.max(1, Number(config.windowDays) || 7);
-    const usedIntervals = intervals.slice(-intervalWindow);
-    const consumptionTotal = usedIntervals.reduce((sum, value) => sum + value, 0);
-    const daysConsumption = sorted.length >= 2 ? usedIntervals.length : 0;
-    const avgDailyConsumption = daysConsumption > 0 ? consumptionTotal / daysConsumption : 0;
+    const usedIntervals = intervals.slice(-safeConfig.windowDays);
+    const totalConsumption = usedIntervals.reduce((sum, value) => sum + value, 0);
+    const avgDailyConsumption = usedIntervals.length ? totalConsumption / usedIntervals.length : 0;
 
-    const horizonDays = Math.max(1, Number(config.horizonDays) || 30);
-    const horizonDemand = avgDailyConsumption * horizonDays;
+    const horizonDemand = avgDailyConsumption * safeConfig.horizonDays;
+    const safetyDemand = avgDailyConsumption * safeConfig.safetyExtraDays;
     const stockCurrent = latest.stock;
 
-    const safetyDays = Math.max(0, Number(config.safetyExtraDays) || 0);
-    const safety = avgDailyConsumption * safetyDays;
+    const suggestedRaw = Math.max(0, horizonDemand + safetyDemand - stockCurrent);
+    const suggestedQty = roundToMultiple(suggestedRaw, safeConfig.roundingMultiple);
 
-    const suggestedRaw = Math.max(0, horizonDemand + safety - stockCurrent);
-    const roundingMultiple = Math.max(1, Number(config.roundingMultiple) || 1);
-    const suggestedQty = roundToMultiple(suggestedRaw, roundingMultiple);
+    const coverageRatio = horizonDemand > 0 ? stockCurrent / horizonDemand : Number.POSITIVE_INFINITY;
 
-    let coverageRatio;
-    if (horizonDemand > 0) {
-      coverageRatio = stockCurrent / horizonDemand;
-    } else {
-      coverageRatio = Number.POSITIVE_INFINITY;
-    }
-
-    const minThreshold = (classThresholds.minPct ?? 15) / 100;
-    const buyThreshold = (classThresholds.buyPct ?? 50) / 100;
+    const minThreshold = thresholds.minPct / 100;
+    const buyThreshold = thresholds.buyPct / 100;
 
     let state = 'VERDE';
     let reason = 'Cobertura suficiente';
 
     if (stockCurrent === 0 && horizonDemand === 0) {
       state = 'ROJO';
-      reason = 'Stock=0 y sin consumo';
+      reason = 'Stock=0 y sin consumo reciente';
     } else if (stockCurrent === 0) {
       state = 'ROJO';
       reason = 'Stock=0';
@@ -174,10 +189,10 @@ export function calculateSkuRecommendations(data, config, classBySku) {
       reason = 'Sin consumo reciente';
     } else if (coverageRatio <= minThreshold) {
       state = 'ROJO';
-      reason = `Cobertura <= mínimo (${classThresholds.minPct}%)`;
+      reason = `Cobertura <= mínimo (${thresholds.minPct}%)`;
     } else if (coverageRatio <= buyThreshold) {
       state = 'AMARILLO';
-      reason = `Cobertura <= compra (${classThresholds.buyPct}%)`;
+      reason = `Cobertura <= compra (${thresholds.buyPct}%)`;
     }
 
     return {
@@ -202,6 +217,7 @@ export function calculateSkuRecommendations(data, config, classBySku) {
     if (stateCompare !== 0) {
       return stateCompare;
     }
+
     return a.coveragePct - b.coveragePct;
   });
 }
