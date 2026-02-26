@@ -31,6 +31,8 @@ Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub 
 
 > Nota: la configuración de Vite usa rutas relativas (`base: './'`) para que el build funcione correctamente en subrutas como las de GitHub Pages.
 
+> El workflow está configurado con `npm install` (sin cache de lockfile) para funcionar incluso si el repo no tiene `package-lock.json`.
+
 ## Formato del archivo de entrada
 
 Usa un único archivo Excel (primera hoja), con columnas obligatorias:
