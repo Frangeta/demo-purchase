@@ -46,6 +46,26 @@ Soluciones:
 3. **GitHub Pages**: publica el resultado del workflow (carpeta `dist`) y no el código fuente sin compilar.
 
 
+
+### Diagnóstico rápido para el error en GitHub Pages
+
+Si el error menciona una URL como `https://<usuario>.github.io/<repo>/src/main.jsx`, entonces Pages está sirviendo **código fuente** y no la build.
+
+Checklist:
+
+1. Ejecuta build:
+
+   ```bash
+   npm run build
+   npm run check:pages-build
+   ```
+
+2. Verifica en GitHub Pages que la fuente sea:
+   - rama `gh-pages` carpeta `/ (root)`, **o**
+   - `GitHub Actions` (si usas el workflow de deploy).
+
+3. Asegúrate de **no** publicar `main`/root para este proyecto Vite.
+
 ## Publicar en GitHub Pages
 
 Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub Pages:
