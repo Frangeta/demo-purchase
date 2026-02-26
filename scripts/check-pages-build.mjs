@@ -10,13 +10,12 @@ if (!fs.existsSync(distIndexPath)) {
 
 const html = fs.readFileSync(distIndexPath, 'utf8');
 
-const referencesSourceFiles = /src\/(main|bootstrap)\.(jsx|js)/i.test(html);
+const referencesSourceFiles = /src\/.*\.(jsx|js)/i.test(html);
 const referencesBuiltAssets = /assets\//i.test(html);
 
 if (referencesSourceFiles || !referencesBuiltAssets) {
-  console.error('Build inválido para GitHub Pages: dist/index.html referencia archivos fuente en lugar de assets compilados.');
+  console.error('Build inválido para GitHub Pages: dist/index.html referencia código fuente en lugar de assets compilados.');
   process.exit(1);
 }
 
-console.log('Build OK: dist/index.html referencia assets compilados.');
-console.log('Recuerda configurar Pages para publicar dist (gh-pages o GitHub Actions), no main/root.');
+console.log('Build OK para GitHub Pages: dist/index.html sólo referencia assets compilados.');
