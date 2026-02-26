@@ -1,6 +1,19 @@
 import * as XLSX from 'xlsx';
 
-const REQUIRED_COLUMNS = ['SKU', 'Date', 'Stock'];
+const REQUIRED_COLUMNS = ['SKU', 'Date', 'Stock', 'Categoria'];
+
+function normalizeProductClass(value) {
+  if (value == null) {
+    return 'B';
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+  if (['A', 'B', 'C'].includes(normalized)) {
+    return normalized;
+  }
+
+  return 'B';
+}
 
 export const CLASS_DEFAULTS = {
   A: { minPct: 20, buyPct: 60 },
@@ -145,7 +158,15 @@ export function parseWorkbook(fileArrayBuffer) {
         return null;
       }
 
-      return { sku, date: parsedDate, dateIso: toISODate(parsedDate), stock };
+      const productClass = normalizeProductClass(row.Categoria);
+
+      return {
+        sku,
+        date: parsedDate,
+        dateIso: toISODate(parsedDate),
+        stock,
+        productClass,
+      };
     })
     .filter(Boolean);
 
@@ -201,9 +222,6 @@ export function calculateSkuRecommendations(data, config, classBySku) {
     const safetyDemand = avgDailyConsumption * safeConfig.safetyExtraDays;
     const stockCurrent = latest.stock;
 
-    const suggestedRaw = Math.max(0, horizonDemand + safetyDemand - stockCurrent);
-    const suggestedQty = roundToMultiple(suggestedRaw, safeConfig.roundingMultiple);
-
     const coverageRatio = horizonDemand > 0 ? stockCurrent / horizonDemand : Number.POSITIVE_INFINITY;
 
     const minThreshold = thresholds.minPct / 100;
@@ -229,6 +247,10 @@ export function calculateSkuRecommendations(data, config, classBySku) {
       reason = `Cobertura <= compra (${thresholds.buyPct}%)`;
     }
 
+    const shouldBuy = Number.isFinite(coverageRatio) && coverageRatio <= buyThreshold;
+    const suggestedRaw = shouldBuy ? Math.max(0, horizonDemand + safetyDemand - stockCurrent) : 0;
+    const suggestedQty = roundToMultiple(suggestedRaw, safeConfig.roundingMultiple);
+
     return {
       sku,
       productClass,
@@ -238,6 +260,9 @@ export function calculateSkuRecommendations(data, config, classBySku) {
       horizonDemand,
       coverageRatio,
       coveragePct: Number.isFinite(coverageRatio) ? coverageRatio * 100 : 99900,
+      minThresholdPct: thresholds.minPct,
+      buyThresholdPct: thresholds.buyPct,
+      shouldBuy,
       state,
       reason,
       suggestedQty,
@@ -265,6 +290,9 @@ export function exportRecommendations(results) {
     ConsumoMedioDiario: item.avgDailyConsumption,
     DemandaHorizonte: item.horizonDemand,
     CoberturaPct: Number.isFinite(item.coverageRatio) ? item.coverageRatio * 100 : null,
+    MinPct: item.minThresholdPct,
+    BuyPct: item.buyThresholdPct,
+    CompraHabilitada: item.shouldBuy ? 'SI' : 'NO',
     Estado: item.state,
     Motivo: item.reason,
     CantidadSugerida: item.suggestedQty,

@@ -60,7 +60,7 @@ function App() {
       const parsed = parseWorkbook(buffer);
       const skuClassSeed = parsed.reduce((acc, row) => {
         if (!acc[row.sku]) {
-          acc[row.sku] = classBySku[row.sku] ?? 'B';
+          acc[row.sku] = classBySku[row.sku] ?? row.productClass ?? 'B';
         }
         return acc;
       }, {});

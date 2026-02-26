@@ -18,7 +18,7 @@ function FileUpload({ onFileLoaded, error }) {
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold text-slate-900">1) Carga de datos</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Carga un archivo Excel con columnas <strong>SKU</strong>, <strong>Date</strong> y <strong>Stock</strong>.
+        Carga un archivo Excel con columnas <strong>SKU</strong>, <strong>Date</strong>, <strong>Stock</strong> y <strong>Categoria</strong> (A/B/C).
       </p>
 
       <button
