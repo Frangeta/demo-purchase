@@ -58,7 +58,7 @@ Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub 
 6. La URL quedará publicada en:
    - `https://<tu-usuario>.github.io/<tu-repo>/`
 
-> Nota: la configuración de Vite usa rutas relativas (`base: './'`) para que el build funcione correctamente en subrutas como las de GitHub Pages.
+> Nota: la configuración de Vite detecta automáticamente el nombre del repositorio en GitHub Actions (`GITHUB_REPOSITORY`) y genera `base` como `/<repo>/`, evitando errores de carga de assets en GitHub Pages (por ejemplo al abrir la URL sin slash final). En local mantiene `base: '/'`.
 
 > El workflow está configurado con `npm install` (sin cache de lockfile) para funcionar incluso si el repo no tiene `package-lock.json`.
 

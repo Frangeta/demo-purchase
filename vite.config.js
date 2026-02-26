@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+function getGithubPagesBase() {
+  const repository = process.env.GITHUB_REPOSITORY;
+
+  if (!repository) {
+    return '/';
+  }
+
+  const [, repoName] = repository.split('/');
+  return repoName ? `/${repoName}/` : '/';
+}
+
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  // Usa rutas relativas para que el build funcione en GitHub Pages
-  // (usuario.github.io/repo/) y también cuando se abre desde cualquier subruta.
-  base: './',
-});
+  base: command === 'build' ? getGithubPagesBase() : '/',
+}));
