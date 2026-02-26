@@ -17,6 +17,34 @@ npm run dev
 
 Abre la URL que indique Vite (normalmente `http://localhost:5173`).
 
+### Error común: `Failed to load module script` con MIME `text/jsx`
+
+Si ves este error en el navegador:
+
+```text
+Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/jsx".
+```
+
+significa que estás sirviendo `index.html` y `src/main.jsx` con un servidor estático "genérico" (o abriendo el HTML directo), en vez de usar Vite.
+
+Soluciones:
+
+1. **Desarrollo local**: ejecuta siempre
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+2. **Producción estática**: primero genera build y luego sirve `dist/`
+
+   ```bash
+   npm run build
+   npm run preview
+   ```
+
+3. **GitHub Pages**: publica el resultado del workflow (carpeta `dist`) y no el código fuente sin compilar.
+
 
 ## Publicar en GitHub Pages
 
@@ -24,9 +52,10 @@ Este proyecto ya está preparado para ejecutarse como sitio estático en GitHub 
 
 1. Sube el repo a GitHub.
 2. Asegúrate de trabajar sobre la rama `main`.
-3. En GitHub, ve a **Settings → Pages** y en **Build and deployment** selecciona **GitHub Actions**.
-4. Cada push a `main` ejecutará el workflow `.github/workflows/deploy-pages.yml`.
-5. La URL quedará publicada en:
+3. En GitHub, ve a **Settings → Pages** y en **Build and deployment** selecciona **Deploy from a branch**.
+4. Selecciona la rama **`gh-pages`** y la carpeta **`/ (root)`**.
+5. Cada push a `main` ejecutará el workflow `.github/workflows/deploy-pages.yml`, que compila y publica `dist/` en `gh-pages`.
+6. La URL quedará publicada en:
    - `https://<tu-usuario>.github.io/<tu-repo>/`
 
 > Nota: la configuración de Vite usa rutas relativas (`base: './'`) para que el build funcione correctamente en subrutas como las de GitHub Pages.
