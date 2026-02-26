@@ -32,6 +32,40 @@ function parseDateValue(value) {
       return null;
     }
 
+    const isoLike = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoLike) {
+      const year = Number(isoLike[1]);
+      const month = Number(isoLike[2]);
+      const day = Number(isoLike[3]);
+
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (
+        date.getUTCFullYear() === year
+        && date.getUTCMonth() === month - 1
+        && date.getUTCDate() === day
+      ) {
+        return date;
+      }
+      return null;
+    }
+
+    const latinLike = normalized.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (latinLike) {
+      const day = Number(latinLike[1]);
+      const month = Number(latinLike[2]);
+      const year = Number(latinLike[3]);
+
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (
+        date.getUTCFullYear() === year
+        && date.getUTCMonth() === month - 1
+        && date.getUTCDate() === day
+      ) {
+        return date;
+      }
+      return null;
+    }
+
     const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) {
       return null;
